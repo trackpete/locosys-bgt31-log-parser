@@ -1,0 +1,11 @@
+{
+  "name": "locosys-bgt31-log-parser",
+  "version": "1.0.0",
+  "description": "This will turn into a log parser for the NMEA sentences in my gps logs from various adventures.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
