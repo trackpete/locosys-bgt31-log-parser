@@ -31,7 +31,7 @@ function scanFile(gpsFile, callback) {
   console.log("Scanning data file:", gpsFile);
 
   // Only parse actual GPSUSER text files that we can extract the date from
-  if (fileName = gpsFile.match(/\/GPSUSER_\d+_(\d+)_\d+\.TXT/)) {
+  if (fileName = gpsFile.match(/(\/|\\)GPSUSER_\d+_(\d+)_\d+\.TXT/)) {
     // Instead of using a third party parser, we're going to do some of our own magic
     // Read in the file, find the specific lines we want, split the CSV, and add
     // them to an array
