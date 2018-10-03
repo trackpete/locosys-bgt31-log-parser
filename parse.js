@@ -7,19 +7,21 @@ var async = require("async");
 var fs = require("fs");
 var lineByLineReader = require('line-by-line');
 var geocoder = require('local-reverse-geocoder');
+var distance = require('fast-haversine');
+// Minimum distance in meters between points to dedupe
+var minPointDistance = 25;
 
 console.log("Checking local geodata...");
-geocoder.init({dumpDirectory: 'geodata', load:{alternateNames:false}}, function() {
+/* geocoder.init({dumpDirectory: 'geodata', load:{alternateNames:false}}, function() {
   console.log("Local geodata loaded!");
   loadDataFiles();
-});
-
-
-
+}); */
+loadDataFiles();
 
 function loadDataFiles(callback) {
-  // Configuration parameters - should extract to a config file
+  // gps data file directory
   var dataDir = 'data';
+  // Maximum parallel files to scan
   var maxParallel = 5;
 
   // Find all files in the dataDir then call scanFile to read them
@@ -55,7 +57,10 @@ function scanFile(gpsFile, callback) {
     // Instead of using a third party parser, we're going to do some of our own magic
     // Read in the file, find the specific lines we want, split the CSV, and add
     // them to an array
-    const gpsData = [];
+    var gpsData = [];
+    var lastPoint = {lat: 0, lon: 0};
+    var droppedPoints = 0;
+
   
     // Using line by line to read the file synchronously because we need
     // to compare each line to the previous line(s) to determine how close
@@ -84,41 +89,48 @@ function scanFile(gpsFile, callback) {
           if (lineArray[5] === "W") {
             longDegrees = longDegrees * -1;
           }
-          console.log("Datapoint:", latDegrees, ",", longDegrees);
-          var thisPoint = {latitude: latDegrees, longitude: longDegrees};
-          geocoder.lookUp(thisPoint, function(err, res) {
-            if (err) throw err;
-            //console.log(res[0][0].name);
-            //console.log(JSON.stringify(res, null, 2));
-            gpsData.push(
-            {
-              fileDate: fileDate,
-              rawTime: lineArray[1],
-              latDegrees: latDegrees,
-              longDegrees: longDegrees,
-              quality: lineArray[6],
-              numSats: lineArray[7],
-              dilution: lineArray[8],
-              altitude: lineArray[9],
-              altitudeMeasure: lineArray[10],
-              countryCode: res[0][0].countryCode,
-              placeName: res[0][0].asciiName,
-              timeZone: res[0][0].timezone,
-              localeName: res[0][0].admin1Code.asciiName
-            }); 
-
-          });
-
-
-
-
+          //console.log("Datapoint:", latDegrees, ",", longDegrees);
+          // We're going to calculate the haversine distance between this point
+          // and the last point that was more than minPointDistance away
+          var thisPoint = {lat: latDegrees, lon: longDegrees};
+          //console.log(gpsFile, "Distance:", distance(lastPoint, thisPoint), lastPoint, thisPoint);
+          if (distance(lastPoint, thisPoint) > minPointDistance) {
+            var thisPoint = {latitude: latDegrees, longitude: longDegrees};
+            //geocoder.lookUp(thisPoint, function(err, res) {
+              //if (err) throw err;
+              //console.log(res[0][0].name);
+              //console.log(JSON.stringify(res, null, 2));
+              gpsData.push(
+              {
+                fileDate: fileDate,
+                rawTime: lineArray[1],
+                latDegrees: latDegrees,
+                longDegrees: longDegrees,
+                quality: lineArray[6],
+                numSats: lineArray[7],
+                dilution: lineArray[8],
+                altitude: lineArray[9],
+                altitudeMeasure: lineArray[10],
+                //countryCode: res[0][0].countryCode,
+                //placeName: res[0][0].asciiName,
+                //timeZone: res[0][0].timezone,
+                //localeName: res[0][0].admin1Code.asciiName
+              });  
+            //}); 
+            // Oh yeah, classic lazy implementation of comparison loops
+            lastPoint = {lat: latDegrees, lon: longDegrees};
+          } else {
+            //console.log(gpsFile, lastPoint, "is less than", minPointDistance, "meters from", thisPoint, " - ignoring");
+            droppedPoints++;
+          }
         }
       }
     })
     .on('end', function() {
       // At some point we'll actually do something here
+      //console.log(JSON.stringify(gpsData, null, 2));
       console.log("GPS Array for", gpsFile, "has", gpsData.length, "records");
-      console.log(JSON.stringify(gpsData, null, 2));
+      console.log("(dropped", droppedPoints, "points)");
     });
   } else {
     console.log("Ignoring file", gpsFile, "as it does not appear to be a standard named locosys file");
