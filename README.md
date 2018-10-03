@@ -8,8 +8,18 @@ NMEA sentences are pretty easy to handle directly, but I wanted to enrich them w
 * Remove nodes close to each other to clean up track
 * Enrich with geo data
 
+# Running / In Progress Notes
 
-# Notes
+1. npm install
+2. npm run get-geodata
+3. npm run parse
+
+The parsing start is very much in development.
+
+* Note that the local geodata can take up a lot of space!
+
+
+# Older Notes
 
 https://www.gpsinformation.org/dale/nmea.htm
 

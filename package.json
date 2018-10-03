@@ -4,7 +4,9 @@
   "description": "This will turn into a log parser for the NMEA sentences in my gps logs from various adventures.",
   "main": "parse.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "get-geodata": "set DEBUG=local-reverse-geocoder&&node get-geodata.js",
+    "parse": "node parse.js"
+
   },
   "author": "",
   "license": "ISC",
@@ -12,6 +14,7 @@
     "async": "^2.6.1",
     "fs": "0.0.1-security",
     "line-by-line": "^0.1.6",
+    "local-reverse-geocoder": "^0.4.3",
     "recursive-readdir": "^2.2.2"
   }
 }
