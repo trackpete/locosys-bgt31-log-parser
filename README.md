@@ -1,3 +1,5 @@
+Update: While re-visiting this, I realized somehow I am missing years and years of log data that must've been eaten while transferring things between systems. This is a huge bummer, because I thought when I started this I would have GPS logs of all of my trips for the last ten years - but instead I only have a few trips. :( AUGH.
+
 This will turn into a log parser for the NMEA sentences in my gps logs from various adventures.
 
 I didn't use a full project stack because the intent is for this to be simple standalone code to render data into a format used in another project - it will just dump data into an sqlite database.
@@ -7,6 +9,7 @@ NMEA sentences are pretty easy to handle directly, but I wanted to enrich them w
 * Should remove low confidence nodes
 * Remove nodes close to each other to clean up track
 * Enrich with geo data
+
 
 # Running / In Progress Notes
 
