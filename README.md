@@ -25,7 +25,7 @@ https://www.gpsinformation.org/dale/nmea.htm
 
 * GPGGA: GPS fix data
 * GPGSA: Overall satellite reception data
-* GPRMC: Minimum recommended data
+* GPRMC: Minimum recommended data -> need this for date!
 
 Notes for modules to use:
 

@@ -11,12 +11,16 @@ var distance = require("fast-haversine");
 // Minimum distance in meters between points to dedupe
 var minPointDistance = 25;
 
-console.log("Checking local geodata...");
-/* geocoder.init({dumpDirectory: 'geodata', load:{alternateNames:false}}, function() {
-  console.log("Local geodata loaded!");
-  loadDataFiles();
-}); */
-loadDataFiles();
+console.log("Initializing local geodata, this may take a bit...");
+geocoder.init(
+  { dumpDirectory: "geodata", load: { alternateNames: false } },
+  function() {
+    console.log("Local geodata loaded!");
+    loadDataFiles();
+  }
+);
+
+//loadDataFiles();
 
 function loadDataFiles(callback) {
   // gps data file directory
@@ -28,7 +32,7 @@ function loadDataFiles(callback) {
   // limited to maxParallel file reads at a time
   recurse(dataDir).then(
     function(processFiles) {
-      async.eachLimit(processFiles, maxParallel, scanFile, function(err, bar) {
+      async.eachLimit(processFiles, maxParallel, scanFile, function(err) {
         if (err) throw err;
       });
     },
@@ -38,6 +42,7 @@ function loadDataFiles(callback) {
     }
   );
 }
+
 // Checks to see if we have a valid GPS file and tries to parse it
 // This will include:
 //   * determining date time
@@ -45,13 +50,18 @@ function loadDataFiles(callback) {
 //   * enriching GPS data
 //   * removing nearby datapoints
 //   * outputting data
-function scanFile(gpsFile, callback) {
-  // Only parse actual GPSUSER text files that we can extract the date from
-  if ((fileName = gpsFile.match(/(\/|\\)GPSUSER_\d+_(\d+)_\d+\.TXT/))) {
-    var fileDate = fileName[2];
-    // Convert the date extracted from the filename to epoch base time - we will add
-    // the UTC timestamps from the NMEA records to this later to create epoch milli
-    // timestamps for tracking
+
+function printName(fileName, loopNextSet) {
+  console.log(fileName);
+  loopNextSet();
+
+};
+
+function scanFile(gpsFile, loopNextSet) {
+  // All of the proper files should have this name format in theory
+  if ((fileName = gpsFile.match(/(\/|\\)(GPSUSER|pwx)_\d+_(\d+)_\d+\.TXT/))) {
+    var fileDate = fileName[3];
+    // Convert the date extracted from the filename to epoch base time for informational output
     console.log("Scanning data file:", gpsFile, "with date of", fileDate);
 
     // Instead of using a third party parser, we're going to do some of our own magic
@@ -60,6 +70,10 @@ function scanFile(gpsFile, callback) {
     var gpsData = [];
     var lastPoint = { lat: 0, lon: 0 };
     var droppedPoints = 0;
+
+    // Tracking localeNames for summary output - using a set to only store unique values
+    var localeNames = new Set();
+
 
     // Using line by line to read the file synchronously because we need
     // to compare each line to the previous line(s) to determine how close
@@ -72,51 +86,74 @@ function scanFile(gpsFile, callback) {
         // Only process NMEA sentences for GPS location data
         // This is a CSV formatted line and we're just going to split it into an array
         // and extract the relevant portions that we care about directly.
-        if (line.startsWith("$GPGGA")) {
+        if (line.startsWith("$GPRMC")) {
           var lineArray = line.split(",");
-          // don't add invalid fixes
-          if (lineArray[6] > 0) {
-            // Calculate decimal degrees from latlong
-            // We're using nested ifs here to keep this synch and clean
-            var latData = lineArray[2].match(/^(\d\d)(\d\d\.\d+)$/);
+          // only use valid fixes
+          if (lineArray[2] == "A") {
+            var latData = lineArray[3].match(/^(\d\d)(\d\d\.\d+)$/);
             var latDegrees =
               parseFloat(latData[1]) + parseFloat(latData[2] / 60);
-            if (lineArray[3] === "S") {
+            if (lineArray[4] === "S") {
               latDegrees = latDegrees * -1;
             }
-            var longData = lineArray[4].match(/^(\d\d\d)(\d\d\.\d+)$/);
+            var longData = lineArray[5].match(/^(\d\d\d)(\d\d\.\d+)$/);
             var longDegrees =
               parseFloat(longData[1]) + parseFloat(longData[2] / 60);
-            if (lineArray[5] === "W") {
+            if (lineArray[6] === "W") {
               longDegrees = longDegrees * -1;
             }
-            //console.log("Datapoint:", latDegrees, ",", longDegrees);
+            // console.log("Datapoint:", latDegrees, ",", longDegrees);
             // We're going to calculate the haversine distance between this point
             // and the last point that was more than minPointDistance away
             var thisPoint = { lat: latDegrees, lon: longDegrees };
             //console.log(gpsFile, "Distance:", distance(lastPoint, thisPoint), lastPoint, thisPoint);
             if (distance(lastPoint, thisPoint) > minPointDistance) {
-              var thisPoint = { latitude: latDegrees, longitude: longDegrees };
-              //geocoder.lookUp(thisPoint, function(err, res) {
-              //if (err) throw err;
-              //console.log(res[0][0].name);
-              //console.log(JSON.stringify(res, null, 2));
-              gpsData.push({
-                fileDate: fileDate,
-                rawTime: lineArray[1],
-                latDegrees: latDegrees,
-                longDegrees: longDegrees,
-                quality: lineArray[6],
-                numSats: lineArray[7],
-                dilution: lineArray[8],
-                altitude: lineArray[9],
-                altitudeMeasure: lineArray[10]
-                //countryCode: res[0][0].countryCode,
-                //placeName: res[0][0].asciiName,
-                //timeZone: res[0][0].timezone,
-                //localeName: res[0][0].admin1Code.asciiName
+
+              // lookup some information on this point to save for later
+              geocoder.lookUp({ latitude: latDegrees, longitude: longDegrees }, function(err, res) {                
+                if (err) throw err;
+                //console.log(JSON.stringify({ latitude: latDegrees, longitude: longDegrees }, null, 2), JSON.stringify(res, null, 2));
+
+                // Calculate time and date
+                var timeArray = lineArray[1].match(
+                  /^(\d\d)(\d\d)(\d\d)\.(\d\d\d)/
+                );
+                var dateArray = lineArray[9].match(/^(\d\d)(\d\d)(\d\d)/);
+                var thisPointDate = new Date(
+                  "20" +
+                    dateArray[3] +
+                    "-" +
+                    dateArray[2] +
+                    "-" +
+                    dateArray[1] +
+                    "T" +
+                    timeArray[1] +
+                    ":" +
+                    timeArray[2] +
+                    ":" +
+                    timeArray[3] +
+                    "." +
+                    timeArray[4] +
+                    "Z"
+                );
+                //console.log(thisPointDate);
+                // Convert knots to MPH - 1 knot = 1.15078 mph
+                var groundSpeed = lineArray[8] * 1.15078;
+
+                gpsData.push({
+                  fileDate: fileDate,
+                  date: thisPointDate,
+                  latDegrees: latDegrees,
+                  longDegrees: longDegrees,
+                  groundSpeedMPH: groundSpeed,
+                  countryCode: res[0][0].countryCode,
+                  placeName: res[0][0].asciiName,
+                  timeZone: res[0][0].timezone,
+                  localeName: res[0][0].admin1Code.asciiName
+                });
+                localeNames.add(res[0][0].admin1Code.asciiName + ' ' +  res[0][0].countryCode)
               });
-              //});
+
               // Oh yeah, classic lazy implementation of comparison loops
               lastPoint = { lat: latDegrees, lon: longDegrees };
             } else {
@@ -128,9 +165,9 @@ function scanFile(gpsFile, callback) {
       })
       .on("end", function() {
         // At some point we'll actually do something here
-        //console.log(JSON.stringify(gpsData, null, 2));
-        console.log("GPS Array for", gpsFile, "has", gpsData.length, "records");
-        console.log("(dropped", droppedPoints, "points)");
+        // console.log(JSON.stringify(gpsData, null, 2));
+        console.log("GPS Array for", gpsFile, "has", gpsData.length, "records (" + droppedPoints + " dropped) in the following locales:", localeNames);
+        loopNextSet();
       });
   } else {
     console.log(

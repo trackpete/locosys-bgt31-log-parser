@@ -15,6 +15,8 @@
     "fs": "0.0.1-security",
     "line-by-line": "^0.1.6",
     "local-reverse-geocoder": "^0.4.3",
-    "recursive-readdir": "^2.2.2"
+    "natives": "^1.1.6",
+    "recursive-readdir": "^2.2.2",
+    "staticmaps": "^1.1.0"
   }
 }
