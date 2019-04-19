@@ -12,10 +12,16 @@ var distance = require("fast-haversine");
 var minPointDistance = 25;
 
 console.log("Initializing local geodata, this may take a bit...");
+var startGeodata = process.hrtime();
 geocoder.init(
   { dumpDirectory: "geodata", load: { alternateNames: false } },
   function() {
-    console.log("Local geodata loaded!");
+    endGeodata = process.hrtime(startGeodata);
+    console.log(
+      "Local geodata loaded in %ds %dms",
+      endGeodata[0],
+      endGeodata[1] / 1000000
+    );
     loadDataFiles();
   }
 );
@@ -30,8 +36,10 @@ function loadDataFiles(callback) {
 
   // Find all files in the dataDir then call scanFile to read them
   // limited to maxParallel file reads at a time
+
   recurse(dataDir).then(
     function(processFiles) {
+      console.log("Found", processFiles.length, "files to process!");
       async.eachLimit(processFiles, maxParallel, scanFile, function(err) {
         if (err) throw err;
       });
@@ -51,18 +59,16 @@ function loadDataFiles(callback) {
 //   * removing nearby datapoints
 //   * outputting data
 
-function printName(fileName, loopNextSet) {
+function printName(fileName, loopNext) {
   console.log(fileName);
-  loopNextSet();
+  loopNext();
+}
 
-};
-
-function scanFile(gpsFile, loopNextSet) {
-  // All of the proper files should have this name format in theory
-  if ((fileName = gpsFile.match(/(\/|\\)(GPSUSER|pwx)_\d+_(\d+)_\d+\.TXT/))) {
-    var fileDate = fileName[3];
+function scanFile(gpsFile, loopNext) {
+  // Make sure we only try to mess with text files
+  if ((fileName = gpsFile.match(/(\/|\\).*\.(TXT|txt)/))) {
     // Convert the date extracted from the filename to epoch base time for informational output
-    console.log("Scanning data file:", gpsFile, "with date of", fileDate);
+    console.log("Scanning data file:", gpsFile);
 
     // Instead of using a third party parser, we're going to do some of our own magic
     // Read in the file, find the specific lines we want, split the CSV, and add
@@ -73,7 +79,6 @@ function scanFile(gpsFile, loopNextSet) {
 
     // Tracking localeNames for summary output - using a set to only store unique values
     var localeNames = new Set();
-
 
     // Using line by line to read the file synchronously because we need
     // to compare each line to the previous line(s) to determine how close
@@ -108,51 +113,54 @@ function scanFile(gpsFile, loopNextSet) {
             var thisPoint = { lat: latDegrees, lon: longDegrees };
             //console.log(gpsFile, "Distance:", distance(lastPoint, thisPoint), lastPoint, thisPoint);
             if (distance(lastPoint, thisPoint) > minPointDistance) {
-
               // lookup some information on this point to save for later
-              geocoder.lookUp({ latitude: latDegrees, longitude: longDegrees }, function(err, res) {                
-                if (err) throw err;
-                //console.log(JSON.stringify({ latitude: latDegrees, longitude: longDegrees }, null, 2), JSON.stringify(res, null, 2));
+              geocoder.lookUp(
+                { latitude: latDegrees, longitude: longDegrees },
+                function(err, res) {
+                  if (err) throw err;
+                  //console.log(JSON.stringify({ latitude: latDegrees, longitude: longDegrees }, null, 2), JSON.stringify(res, null, 2));
 
-                // Calculate time and date
-                var timeArray = lineArray[1].match(
-                  /^(\d\d)(\d\d)(\d\d)\.(\d\d\d)/
-                );
-                var dateArray = lineArray[9].match(/^(\d\d)(\d\d)(\d\d)/);
-                var thisPointDate = new Date(
-                  "20" +
-                    dateArray[3] +
-                    "-" +
-                    dateArray[2] +
-                    "-" +
-                    dateArray[1] +
-                    "T" +
-                    timeArray[1] +
-                    ":" +
-                    timeArray[2] +
-                    ":" +
-                    timeArray[3] +
-                    "." +
-                    timeArray[4] +
-                    "Z"
-                );
-                //console.log(thisPointDate);
-                // Convert knots to MPH - 1 knot = 1.15078 mph
-                var groundSpeed = lineArray[8] * 1.15078;
+                  // Calculate time and date
+                  var timeArray = lineArray[1].match(
+                    /^(\d\d)(\d\d)(\d\d)\.(\d\d\d)/
+                  );
+                  var dateArray = lineArray[9].match(/^(\d\d)(\d\d)(\d\d)/);
+                  var thisPointDate = new Date(
+                    "20" +
+                      dateArray[3] +
+                      "-" +
+                      dateArray[2] +
+                      "-" +
+                      dateArray[1] +
+                      "T" +
+                      timeArray[1] +
+                      ":" +
+                      timeArray[2] +
+                      ":" +
+                      timeArray[3] +
+                      "." +
+                      timeArray[4] +
+                      "Z"
+                  );
+                  //console.log(thisPointDate);
+                  // Convert knots to MPH - 1 knot = 1.15078 mph
+                  var groundSpeed = lineArray[8] * 1.15078;
 
-                gpsData.push({
-                  fileDate: fileDate,
-                  date: thisPointDate,
-                  latDegrees: latDegrees,
-                  longDegrees: longDegrees,
-                  groundSpeedMPH: groundSpeed,
-                  countryCode: res[0][0].countryCode,
-                  placeName: res[0][0].asciiName,
-                  timeZone: res[0][0].timezone,
-                  localeName: res[0][0].admin1Code.asciiName
-                });
-                localeNames.add(res[0][0].admin1Code.asciiName + ' ' +  res[0][0].countryCode)
-              });
+                  gpsData.push({
+                    date: thisPointDate,
+                    latDegrees: latDegrees,
+                    longDegrees: longDegrees,
+                    groundSpeedMPH: groundSpeed,
+                    countryCode: res[0][0].countryCode,
+                    placeName: res[0][0].asciiName,
+                    timeZone: res[0][0].timezone,
+                    localeName: res[0][0].admin1Code.asciiName
+                  });
+                  localeNames.add(
+                    res[0][0].admin1Code.asciiName + " " + res[0][0].countryCode
+                  );
+                }
+              );
 
               // Oh yeah, classic lazy implementation of comparison loops
               lastPoint = { lat: latDegrees, lon: longDegrees };
@@ -166,14 +174,30 @@ function scanFile(gpsFile, loopNextSet) {
       .on("end", function() {
         // At some point we'll actually do something here
         // console.log(JSON.stringify(gpsData, null, 2));
-        console.log("GPS Array for", gpsFile, "has", gpsData.length, "records (" + droppedPoints + " dropped) in the following locales:", localeNames);
-        loopNextSet();
+        if (gpsData.length < 1) {
+          // Some files don't have records because they didn't stay on long enough, this can be used for debugging those.
+          //console.log("WARNING: GPS Array for", gpsFile, "has ZERO records!");
+        } else if (localeNames.size > 0) {
+          // Throws some final information about the files processed
+          console.log("GPS Array for", gpsFile, "has", gpsData.length, "records (" + droppedPoints + " dropped) in the following locales:", localeNames);
+        } else {
+          // Throws some information about files that don't have any locale data, which means something went wrong in reverse lookup
+          console.log(
+            "WARNING: GPS Array for",
+            gpsFile,
+            "has",
+            gpsData.length,
+            "records (" + droppedPoints + " dropped) but no locales!"
+          );
+          //console.log(JSON.stringify(gpsData, null, 2));
+        }
+        loopNext();
       });
   } else {
     console.log(
       "Ignoring file",
       gpsFile,
-      "as it does not appear to be a standard named locosys file"
+      "as it's not a text file"
     );
   }
 }
