@@ -4,8 +4,8 @@
   "description": "This will turn into a log parser for the NMEA sentences in my gps logs from various adventures.",
   "main": "parse.js",
   "scripts": {
-    "get-geodata": "set DEBUG=local-reverse-geocoder&&node get-geodata.js",
-    "parse": "node parse.js"
+    "get-geodata": "rm -rf geodata/ && set DEBUG=local-reverse-geocoder&&node get-geodata.js",
+    "parse": "node parse-gps-files-to-sql.js"
   },
   "author": "",
   "license": "ISC",
@@ -17,6 +17,7 @@
     "local-reverse-geocoder": "^0.4.3",
     "natives": "^1.1.6",
     "recursive-readdir": "^2.2.2",
+    "sqlite3": "^4.0.6",
     "staticmaps": "^1.1.0"
   }
 }

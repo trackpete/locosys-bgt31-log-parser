@@ -8,6 +8,14 @@ var fs = require("fs");
 var lineByLineReader = require("line-by-line");
 var geocoder = require("local-reverse-geocoder");
 var distance = require("fast-haversine");
+var sqlite3 = require("sqlite3").verbose();
+var db = new sqlite3.Database("cache/localdb.sqlite");
+
+// Create SQLite table
+db.run(
+  "CREATE TABLE IF NOT EXISTS gpsData (dateTime TEXT PRIMARY KEY, countryCode TEXT, placeName TEXT, timeZone TEXT, localeName TEXT, latDegrees NUMERIC, longDegrees NUMERIC, groundSpeedMPH NUMERIC)"
+);
+
 // Minimum distance in meters between points to dedupe
 var minPointDistance = 25;
 
@@ -146,19 +154,37 @@ function scanFile(gpsFile, loopNext) {
                   // Convert knots to MPH - 1 knot = 1.15078 mph
                   var groundSpeed = lineArray[8] * 1.15078;
 
+                  // This is leftover from initial debugging, leaving it in for now in case we ever want this structure again for future debug
                   gpsData.push({
                     date: thisPointDate,
-                    latDegrees: latDegrees,
-                    longDegrees: longDegrees,
-                    groundSpeedMPH: groundSpeed,
                     countryCode: res[0][0].countryCode,
                     placeName: res[0][0].asciiName,
                     timeZone: res[0][0].timezone,
-                    localeName: res[0][0].admin1Code.asciiName
+                    localeName: res[0][0].admin1Code.asciiName,
+                    latDegrees: latDegrees,
+                    longDegrees: longDegrees,
+                    groundSpeedMPH: groundSpeed                    
                   });
+                  // Store a set of localenames for output
                   localeNames.add(
                     res[0][0].admin1Code.asciiName + " " + res[0][0].countryCode
                   );
+                  // Add this data to sqlite
+                  //   "CREATE TABLE IF NOT EXISTS gpsData (date TEXT PRIMARY KEY, countryCode TEXT, placeName TEXT, timeZone TEXT, localeName TEXT, latDegrees NUMERIC, longDegrees NUMERIC, groundSpeedMPH NUMERIC)"
+                  db.run(
+                    "INSERT OR REPLACE INTO gpsData (dateTime, countryCode, placeName, timeZone, localeName, latDegrees, longDegrees, groundspeedMPH) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                      thisPointDate.toISOString(),
+                      res[0][0].countryCode,
+                      res[0][0].asciiName,
+                      res[0][0].timezone,
+                      res[0][0].admin1Code.asciiName,
+                      latDegrees,
+                      longDegrees,
+                      groundSpeed 
+                    ]
+                  );
+
                 }
               );
 
@@ -180,6 +206,7 @@ function scanFile(gpsFile, loopNext) {
         } else if (localeNames.size > 0) {
           // Throws some final information about the files processed
           console.log("GPS Array for", gpsFile, "has", gpsData.length, "records (" + droppedPoints + " dropped) in the following locales:", localeNames);
+          //console.log(JSON.stringify(gpsData, null, 2));
         } else {
           // Throws some information about files that don't have any locale data, which means something went wrong in reverse lookup
           console.log(

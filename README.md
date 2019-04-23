@@ -45,3 +45,8 @@ Removing points close to each other is an interesting proposition because we hav
 3. Then move onto the next line that's still in the object, repeat.
 
 Why not just do a filter on points? If I visit position X and then go to Y/Z/etc. then come back to X, I don't want to remove all re-occurences of X. Iterating by timestamps will ensure I only remove duplicates of each "unique" visit to X.
+
+# SQLite notes
+
+* Get distinct dates: `SELECT DISTINCT DATE(dateTime) FROM gpsdata;`
+* all states/countries: `select distinct localeName, countryCode from gpsData order by countryCode;`

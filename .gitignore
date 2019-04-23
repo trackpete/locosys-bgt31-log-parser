@@ -1,3 +1,4 @@
 node_modules
-geodata
-data
+geodata/
+data/
+cache/
