@@ -1,4 +1,4 @@
-Update: While re-visiting this, I realized somehow I am missing years and years of log data that must've been eaten while transferring things between systems. This is a huge bummer, because I thought when I started this I would have GPS logs of all of my trips for the last ten years - but instead I only have a few trips. :( AUGH.
+*Note: This is a work in progress!*
 
 This will turn into a log parser for the NMEA sentences in my gps logs from various adventures.
 

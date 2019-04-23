@@ -17,7 +17,8 @@ db.run(
 );
 
 // Minimum distance in meters between points to dedupe
-var minPointDistance = 25;
+// Using half a kilometer currently to only store critical points for an overall map
+var minPointDistance = 500;
 
 console.log("Initializing local geodata, this may take a bit...");
 var startGeodata = process.hrtime();
@@ -47,6 +48,7 @@ function loadDataFiles(callback) {
 
   recurse(dataDir).then(
     function(processFiles) {
+      //console.log(JSON.stringify(processFiles, null, 2));
       console.log("Found", processFiles.length, "files to process!");
       async.eachLimit(processFiles, maxParallel, scanFile, function(err) {
         if (err) throw err;
@@ -101,8 +103,12 @@ function scanFile(gpsFile, loopNext) {
         // and extract the relevant portions that we care about directly.
         if (line.startsWith("$GPRMC")) {
           var lineArray = line.split(",");
-          // only use valid fixes
-          if (lineArray[2] == "A") {
+          // only use valid fixes - hrm, looks like the converted logs show V here for some reason...  wtf? trying an alternate option
+          // if (lineArray[2] == "A") {
+          // since the converted gpx files for SPOT have some wonky lines with valid fixes that say V for invalid, switched this
+          // to require coordinates and a valid timestamp
+          if (lineArray[3] != '' && lineArray[5] != '' && lineArray[1] > 0) {
+            //console.log(line);
             var latData = lineArray[3].match(/^(\d\d)(\d\d\.\d+)$/);
             var latDegrees =
               parseFloat(latData[1]) + parseFloat(latData[2] / 60);
@@ -116,6 +122,28 @@ function scanFile(gpsFile, loopNext) {
               longDegrees = longDegrees * -1;
             }
             // console.log("Datapoint:", latDegrees, ",", longDegrees);
+
+            // Calculate time and date
+            var timeArray = lineArray[1].match(/^(\d\d)(\d\d)(\d\d)\.(\d\d\d)/);
+            var dateArray = lineArray[9].match(/^(\d\d)(\d\d)(\d\d)/);            
+            var thisPointDate = new Date(
+              "20" +
+                dateArray[3] +
+                "-" +
+                dateArray[2] +
+                "-" +
+                dateArray[1] +
+                "T" +
+                timeArray[1] +
+                ":" +
+                timeArray[2] +
+                ":" +
+                timeArray[3] +
+                "." +
+                timeArray[4] +
+                "Z"
+            );
+            //console.log(thisPointDate);
             // We're going to calculate the haversine distance between this point
             // and the last point that was more than minPointDistance away
             var thisPoint = { lat: latDegrees, lon: longDegrees };
@@ -128,33 +156,12 @@ function scanFile(gpsFile, loopNext) {
                   if (err) throw err;
                   //console.log(JSON.stringify({ latitude: latDegrees, longitude: longDegrees }, null, 2), JSON.stringify(res, null, 2));
 
-                  // Calculate time and date
-                  var timeArray = lineArray[1].match(
-                    /^(\d\d)(\d\d)(\d\d)\.(\d\d\d)/
-                  );
-                  var dateArray = lineArray[9].match(/^(\d\d)(\d\d)(\d\d)/);
-                  var thisPointDate = new Date(
-                    "20" +
-                      dateArray[3] +
-                      "-" +
-                      dateArray[2] +
-                      "-" +
-                      dateArray[1] +
-                      "T" +
-                      timeArray[1] +
-                      ":" +
-                      timeArray[2] +
-                      ":" +
-                      timeArray[3] +
-                      "." +
-                      timeArray[4] +
-                      "Z"
-                  );
                   //console.log(thisPointDate);
                   // Convert knots to MPH - 1 knot = 1.15078 mph
                   var groundSpeed = lineArray[8] * 1.15078;
 
                   // This is leftover from initial debugging, leaving it in for now in case we ever want this structure again for future debug
+                  // Note that this does require a fair bit of memory in some places so...
                   gpsData.push({
                     date: thisPointDate,
                     countryCode: res[0][0].countryCode,
@@ -163,14 +170,15 @@ function scanFile(gpsFile, loopNext) {
                     localeName: res[0][0].admin1Code.asciiName,
                     latDegrees: latDegrees,
                     longDegrees: longDegrees,
-                    groundSpeedMPH: groundSpeed                    
+                    groundSpeedMPH: groundSpeed
                   });
                   // Store a set of localenames for output
                   localeNames.add(
                     res[0][0].admin1Code.asciiName + " " + res[0][0].countryCode
                   );
                   // Add this data to sqlite
-                  //   "CREATE TABLE IF NOT EXISTS gpsData (date TEXT PRIMARY KEY, countryCode TEXT, placeName TEXT, timeZone TEXT, localeName TEXT, latDegrees NUMERIC, longDegrees NUMERIC, groundSpeedMPH NUMERIC)"
+                  // Note: This is a lot slower than doing it in bulk using gpsData after it's done, but since I'm only doing this once
+                  // I just stuck with the slow/simple method of inserting each row.
                   db.run(
                     "INSERT OR REPLACE INTO gpsData (dateTime, countryCode, placeName, timeZone, localeName, latDegrees, longDegrees, groundspeedMPH) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     [
@@ -181,13 +189,11 @@ function scanFile(gpsFile, loopNext) {
                       res[0][0].admin1Code.asciiName,
                       latDegrees,
                       longDegrees,
-                      groundSpeed 
+                      groundSpeed
                     ]
                   );
-
                 }
               );
-
               // Oh yeah, classic lazy implementation of comparison loops
               lastPoint = { lat: latDegrees, lon: longDegrees };
             } else {
@@ -202,10 +208,17 @@ function scanFile(gpsFile, loopNext) {
         // console.log(JSON.stringify(gpsData, null, 2));
         if (gpsData.length < 1) {
           // Some files don't have records because they didn't stay on long enough, this can be used for debugging those.
-          //console.log("WARNING: GPS Array for", gpsFile, "has ZERO records!");
+          console.log("WARNING: GPS Array for", gpsFile, "has ZERO records!");
         } else if (localeNames.size > 0) {
           // Throws some final information about the files processed
-          console.log("GPS Array for", gpsFile, "has", gpsData.length, "records (" + droppedPoints + " dropped) in the following locales:", localeNames);
+          console.log(
+            "GPS Array for",
+            gpsFile,
+            "has",
+            gpsData.length,
+            "records (" + droppedPoints + " dropped) in the following locales:",
+            localeNames
+          );
           //console.log(JSON.stringify(gpsData, null, 2));
         } else {
           // Throws some information about files that don't have any locale data, which means something went wrong in reverse lookup
@@ -221,10 +234,6 @@ function scanFile(gpsFile, loopNext) {
         loopNext();
       });
   } else {
-    console.log(
-      "Ignoring file",
-      gpsFile,
-      "as it's not a text file"
-    );
+    console.log("Ignoring file", gpsFile, "as it's not a text file");
   }
 }
