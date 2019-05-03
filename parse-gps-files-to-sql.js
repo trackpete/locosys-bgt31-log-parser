@@ -17,8 +17,8 @@ db.run(
 );
 
 // Minimum distance in meters between points to dedupe
-// Using half a kilometer currently to only store critical points for an overall map
-var minPointDistance = 500;
+// Using a kilometer currently to only store critical points for an overall map
+var minPointDistance = 1000;
 
 console.log("Initializing local geodata, this may take a bit...");
 var startGeodata = process.hrtime();
@@ -41,7 +41,7 @@ function loadDataFiles(callback) {
   // gps data file directory
   var dataDir = "data";
   // Maximum parallel files to scan
-  var maxParallel = 5;
+  var maxParallel = 4;
 
   // Find all files in the dataDir then call scanFile to read them
   // limited to maxParallel file reads at a time
@@ -84,7 +84,9 @@ function scanFile(gpsFile, loopNext) {
     // Read in the file, find the specific lines we want, split the CSV, and add
     // them to an array
     var gpsData = [];
-    var lastPoint = { lat: 0, lon: 0 };
+    // Set the first lastPoint to an empty object so we always save the first one - this is important
+    // because having the distance too far away causes the fast haversine checker to NaN
+    var lastPoint = { firstPoint: true };
     var droppedPoints = 0;
 
     // Tracking localeNames for summary output - using a set to only store unique values
@@ -107,7 +109,7 @@ function scanFile(gpsFile, loopNext) {
           // if (lineArray[2] == "A") {
           // since the converted gpx files for SPOT have some wonky lines with valid fixes that say V for invalid, switched this
           // to require coordinates and a valid timestamp
-          if (lineArray[3] != '' && lineArray[5] != '' && lineArray[1] > 0) {
+          if (lineArray[3] != "" && lineArray[5] != "" && lineArray[1] > 0) {
             //console.log(line);
             var latData = lineArray[3].match(/^(\d\d)(\d\d\.\d+)$/);
             var latDegrees =
@@ -125,7 +127,7 @@ function scanFile(gpsFile, loopNext) {
 
             // Calculate time and date
             var timeArray = lineArray[1].match(/^(\d\d)(\d\d)(\d\d)\.(\d\d\d)/);
-            var dateArray = lineArray[9].match(/^(\d\d)(\d\d)(\d\d)/);            
+            var dateArray = lineArray[9].match(/^(\d\d)(\d\d)(\d\d)/);
             var thisPointDate = new Date(
               "20" +
                 dateArray[3] +
@@ -147,8 +149,14 @@ function scanFile(gpsFile, loopNext) {
             // We're going to calculate the haversine distance between this point
             // and the last point that was more than minPointDistance away
             var thisPoint = { lat: latDegrees, lon: longDegrees };
+
+            // This is for debugging - I should've implemented a debug option, hrm.
             //console.log(gpsFile, "Distance:", distance(lastPoint, thisPoint), lastPoint, thisPoint);
-            if (distance(lastPoint, thisPoint) > minPointDistance) {
+
+            if (
+              distance(lastPoint, thisPoint) > minPointDistance ||
+              lastPoint.firstPoint == true
+            ) {
               // lookup some information on this point to save for later
               geocoder.lookUp(
                 { latitude: latDegrees, longitude: longDegrees },
@@ -210,7 +218,7 @@ function scanFile(gpsFile, loopNext) {
           // Some files don't have records because they didn't stay on long enough, this can be used for debugging those.
           console.log("WARNING: GPS Array for", gpsFile, "has ZERO records!");
         } else if (localeNames.size > 0) {
-          // Throws some final information about the files processed
+          // Throws some final information about the files processed - note, temporarily removing for debugging empty files
           console.log(
             "GPS Array for",
             gpsFile,

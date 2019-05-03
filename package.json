@@ -10,13 +10,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "async": "^2.6.1",
+    "async": "^2.6.2",
     "fast-haversine": "^1.0.0",
     "fs": "0.0.1-security",
     "line-by-line": "^0.1.6",
-    "local-reverse-geocoder": "^0.4.3",
+    "local-reverse-geocoder": "^0.4.5",
     "natives": "^1.1.6",
     "recursive-readdir": "^2.2.2",
+    "sharp": "^0.22.0",
     "sqlite3": "^4.0.6",
     "staticmaps": "^1.1.0"
   }

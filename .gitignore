@@ -1,4 +1,5 @@
 node_modules
-geodata/
-data/
-cache/
+geodata
+data
+cache
+output.txt
