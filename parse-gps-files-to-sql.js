@@ -17,8 +17,8 @@ db.run(
 );
 
 // Minimum distance in meters between points to dedupe
-// Using a kilometer currently to only store critical points for an overall map
-var minPointDistance = 1000;
+// Using x currently to only store critical points for an overall map
+var minPointDistance = 5000;
 
 console.log("Initializing local geodata, this may take a bit...");
 var startGeodata = process.hrtime();
@@ -41,7 +41,7 @@ function loadDataFiles(callback) {
   // gps data file directory
   var dataDir = "data";
   // Maximum parallel files to scan
-  var maxParallel = 4;
+  var maxParallel = 6;
 
   // Find all files in the dataDir then call scanFile to read them
   // limited to maxParallel file reads at a time

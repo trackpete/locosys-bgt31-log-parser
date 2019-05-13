@@ -6,7 +6,6 @@ I didn't use a full project stack because the intent is for this to be simple st
 
 NMEA sentences are pretty easy to handle directly, but I wanted to enrich them with other geoip data hence I'm just using my own parser instead of grabbing a third party module.
 
-* Should remove low confidence nodes
 * Remove nodes close to each other to clean up track
 * Enrich with geo data
 
@@ -32,7 +31,6 @@ https://www.gpsinformation.org/dale/nmea.htm
 
 Notes for modules to use:
 
-* Bluebird for promises - http://bluebirdjs.com/docs/getting-started.html
 * Reverse geocoding offline - https://www.npmjs.com/package/local-reverse-geocoder
 * Fast haversine distance between points - https://www.npmjs.com/package/fast-haversine
 
@@ -50,3 +48,6 @@ Why not just do a filter on points? If I visit position X and then go to Y/Z/etc
 
 * Get distinct dates: `SELECT DISTINCT DATE(dateTime) FROM gpsdata;`
 * all states/countries: `select distinct localeName, countryCode from gpsData order by countryCode;`
+* Get a node count for 2009: `SELECT count(*) from gpsData WHERE strftime('%Y', dateTime) = '2009';`
+* Get a list of years for which there is data: `select distinct(strftime('%Y', dateTime)) from gpsData;`
+* Show data points for each year: `select strftime('%Y', dateTime), count(*) from gpsData group by strftime('%Y', dateTime);`
