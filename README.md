@@ -51,3 +51,24 @@ Why not just do a filter on points? If I visit position X and then go to Y/Z/etc
 * Get a node count for 2009: `SELECT count(*) from gpsData WHERE strftime('%Y', dateTime) = '2009';`
 * Get a list of years for which there is data: `select distinct(strftime('%Y', dateTime)) from gpsData;`
 * Show data points for each year: `select strftime('%Y', dateTime), count(*) from gpsData group by strftime('%Y', dateTime);`
+
+
+# A side note
+
+I found an old .gpx file from SPOT that contains part of my trip to Alaska, but the date format isn't being handled properly by GPS Babel.
+
+Perl to the rescue?
+
+```
+#!/usr/bin/perl
+use Time::Piece;
+open(my $fh, '<:encoding(UTF-8)', 'input.txt') || die "ERROR - $!\n";
+while(my $line = <$fh>) {
+  if ($line =~ /<time>(.*?)<\/time>/) {
+    my $oldtime = Time::Piece->strptime($1, '%b %d, %Y %l:%M:%S %p');
+    print "<time>".$oldtime->strftime('%Y-%m-%dT%H:%M:%S +0100')."</time>\n";
+  } else {
+    print $line;
+  }
+}
+```
