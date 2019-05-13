@@ -213,7 +213,7 @@ function scanFile(gpsFile, loopNext) {
       })
       .on("end", function() {
         // At some point we'll actually do something here
-        // console.log(JSON.stringify(gpsData, null, 2));
+        console.log(JSON.stringify(gpsData, null, 2));
         if (gpsData.length < 1) {
           // Some files don't have records because they didn't stay on long enough, this can be used for debugging those.
           console.log("WARNING: GPS Array for", gpsFile, "has ZERO records!");
