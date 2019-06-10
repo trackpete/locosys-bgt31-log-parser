@@ -52,6 +52,9 @@ Why not just do a filter on points? If I visit position X and then go to Y/Z/etc
 * Get a list of years for which there is data: `select distinct(strftime('%Y', dateTime)) from gpsData;`
 * Show data points for each year: `select strftime('%Y', dateTime), count(*) from gpsData group by strftime('%Y', dateTime);`
 
+# Bug notes
+
+* the haversine distance calculation struggles if points are *too* far apart, this causes problems if you have a track with USA and Australia for example. Should fix this some day.
 
 # A side note
 

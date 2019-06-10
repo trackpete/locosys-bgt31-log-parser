@@ -41,7 +41,7 @@ function loadDataFiles(callback) {
   // gps data file directory
   var dataDir = "data";
   // Maximum parallel files to scan
-  var maxParallel = 6;
+  var maxParallel = 8;
 
   // Find all files in the dataDir then call scanFile to read them
   // limited to maxParallel file reads at a time
@@ -148,7 +148,8 @@ function scanFile(gpsFile, loopNext) {
             //console.log(thisPointDate);
             // We're going to calculate the haversine distance between this point
             // and the last point that was more than minPointDistance away
-            var thisPoint = { lat: latDegrees, lon: longDegrees };
+            var thisPoi
+            nt = { lat: latDegrees, lon: longDegrees };
 
             // This is for debugging - I should've implemented a debug option, hrm.
             //console.log(gpsFile, "Distance:", distance(lastPoint, thisPoint), lastPoint, thisPoint);

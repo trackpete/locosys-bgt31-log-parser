@@ -10,8 +10,9 @@ var db = new sqlite3.Database("cache/localdb.sqlite");
 // "CREATE TABLE IF NOT EXISTS gpsData (dateTime TEXT PRIMARY KEY, countryCode TEXT, placeName TEXT, timeZone TEXT, localeName TEXT, latDegrees NUMERIC, longDegrees NUMERIC, groundSpeedMPH NUMERIC)"
 
 const options = {
-  width: 8000,
-  height: 6000
+  width: 6000,
+  height: 4000,
+  tileUrl: 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png'
 };
 const map = new StaticMaps(options);
 
@@ -24,7 +25,7 @@ const marker = {
 };  
 
 // Pull in data from SQL for testing
-//var sql = `SELECT * FROM gpsData WHERE strftime('%Y', dateTime) = '2010' ORDER BY dateTime`;
+//var sql = `SELECT * FROM gpsData WHERE strftime('%Y', dateTime) = '2019' ORDER BY dateTime`;
 var sql = `SELECT * FROM gpsData ORDER BY dateTime ASC`;
 
 
@@ -39,7 +40,7 @@ db.all(sql, [], (err, rows) => {
     marker.img = "marker-" + thisYear + ".png";
     marker.coord = [ row.longDegrees, row.latDegrees ];
     map.addMarker(marker);
-    console.log("Adding Marker for:", row.latDegrees, row.longDegrees);
+    //console.log("Adding Marker for:", row.latDegrees, row.longDegrees);
   });
   console.log(" Rendering...");
 
